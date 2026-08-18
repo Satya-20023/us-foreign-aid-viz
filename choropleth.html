@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>US Foreign Aid — D3 choropleth</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Georgia, serif;
+        background: #12100e;
+        color: #f3ead8;
+      }
+      header {
+        padding: 1.2rem 1.6rem;
+        border-bottom: 1px solid #333;
+      }
+      svg {
+        width: 100%;
+        height: calc(100vh - 72px);
+      }
+    </style>
+  </head>
+  <body>
+    <header>US foreign aid choropleth (D3.js) · obligated USD</header>
+    <svg></svg>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+    <script>
+      const W = document.body.clientWidth;
+      const H = window.innerHeight - 72;
+      const svg = d3.select("svg").attr("viewBox", `0 0 ${W} ${H}`);
+
+      Promise.all([
+        fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json").then((r) => r.json()),
+        fetch("data/aid_by_country.json").then((r) => r.json()),
+      ]).then(([world, aid]) => {
+        const values = new Map(aid.map((d) => [d.country.toLowerCase(), d.obligated_usd]));
+        const max = d3.max(aid, (d) => d.obligated_usd);
+        const color = d3.scaleSequential(d3.interpolateYlOrRd).domain([0, max]);
+        const land = topojson.feature(world, world.objects.countries);
+        const proj = d3.geoEqualEarth().fitExtent(
+          [
+            [20, 20],
+            [W - 20, H - 20],
+          ],
+          land
+        );
+        const geo = d3.geoPath(proj);
+        svg
+          .selectAll("path")
+          .data(land.features)
+          .join("path")
+          .attr("d", geo)
+          .attr("fill", (d) => {
+            const name = (d.properties.name || "").toLowerCase();
+            return values.has(name) ? color(values.get(name)) : "#2a2723";
+          })
+          .attr("stroke", "#12100e")
+          .attr("stroke-width", 0.4)
+          .append("title")
+          .text((d) => {
+            const name = d.properties.name;
+            const v = values.get((name || "").toLowerCase());
+            return v ? `${name}: $${Math.round(v).toLocaleString()}` : name;
+          });
+      });
+    </script>
+  </body>
+</html>
